@@ -12,6 +12,7 @@ const color = (c, d) => (/^#[0-9a-fA-F]{6}$/.test(c) ? c : d);
 const send = (ws, o) => { if (ws.readyState === 1) ws.send(JSON.stringify(o)); };
 const all = (o) => clients.forEach((c) => send(c.ws, o));
 
+const uniq = (want, id) => { let base = want || "Joueur", n = base, k = 1; const taken = (x) => [...clients.values()].some((c) => c.p.id !== id && c.p.name.toLowerCase() === x.toLowerCase()); while (taken(n)) { k++; n = base.slice(0, 13) + k; } return n; };
 wss.on("connection", (ws) => {
   const id = String(nextId++), p = { id, name: "Joueur" + id, x: 165, y: 925, hd: 0, sc: null, mv: false, shirt: "#1e88e5", skin: "#a0673a" };
   const c = { ws, p, last: 0, alive: true }; clients.set(id, c);
@@ -20,13 +21,13 @@ wss.on("connection", (ws) => {
   ws.on("message", (raw) => {
     if (raw.length > 700) return;
     let m; try { m = JSON.parse(raw); } catch (e) { return; }
-    if (m.t === "hello") { p.name = clean(m.name, 16) || p.name; p.shirt = color(m.shirt, p.shirt); p.skin = color(m.skin, p.skin); }
+    if (m.t === "hello") { p.name = uniq(clean(m.name, 16).replace(/^@/, "").replace(/\s/g, "_") || p.name, id); send(ws, { t: "you", name: p.name }); p.shirt = color(m.shirt, p.shirt); p.skin = color(m.skin, p.skin); }
     else if (m.t === "pos") { p.x = num(m.x, 0, 2400, p.x); p.y = num(m.y, 0, 2300, p.y); p.hd = num(m.hd, -7, 7, 0); p.sc = m.sc ? clean(m.sc, 20) : null; p.mv = !!m.mv; }
     else if (m.t === "chat" || m.t === "dm") {
       const now = Date.now(); if (now - c.last < 700) return; c.last = now;
       const text = clean(m.text, 140); if (!text) return;
       if (m.t === "chat") all({ t: "chat", id, name: p.name, text, ts: now });
-      else { const to = clients.get(String(m.to)); if (to) send(to.ws, { t: "dm", from: id, name: p.name, text, ts: now }); }
+      else { const want = String(m.to || "").replace(/^@/, "").toLowerCase(), to = [...clients.values()].find((q) => q.p.name.toLowerCase() === want); if (to) send(to.ws, { t: "dm", from: id, name: p.name, text, ts: now }); else send(ws, { t: "dmfail", to: want }); }
     }
   });
   ws.on("close", () => { clients.delete(id); all({ t: "count", n: clients.size }); });
