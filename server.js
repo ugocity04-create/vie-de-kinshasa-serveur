@@ -10,7 +10,7 @@ const wss = new WebSocketServer({ server });
 const SB_URL = (process.env.SUPABASE_URL || "").replace(/\/+$/, ""), SB_KEY = process.env.SUPABASE_ANON_KEY || "";
 async function verify(token) {
   if (!SB_URL || !token) return null;
-  try { const r = await fetch(SB_URL + "/auth/v1/user", { headers: { apikey: SB_KEY, Authorization: "Bearer " + token } }); if (!r.ok) return null; const u = await r.json(); const m = /^([a-z0-9_]{3,16})@/.exec(u.email || ""); return m ? m[1] : null; } catch (e) { return null; }
+  try { const r = await fetch(SB_URL + "/auth/v1/user", { headers: { apikey: SB_KEY, Authorization: "Bearer " + token } }); if (!r.ok) return null; const u = await r.json(); const m = /\+([a-z0-9_]{3,16})@/.exec(u.email || "") || /^([a-z0-9_]{3,16})@/.exec(u.email || ""); return m ? m[1] : null; } catch (e) { return null; }
 }
 const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
 const num = (v, a, b, d) => { v = Number(v); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
