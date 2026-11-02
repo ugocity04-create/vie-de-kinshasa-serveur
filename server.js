@@ -12,6 +12,17 @@ async function verify(token) {
   if (!SB_URL || !token) return null;
   try { const r = await fetch(SB_URL + "/auth/v1/user", { headers: { apikey: SB_KEY, Authorization: "Bearer " + token } }); if (!r.ok) return null; const u = await r.json(); const m = /\+([a-z0-9_]{3,16})@/.exec(u.email || "") || /^([a-z0-9_]{3,16})@/.exec(u.email || ""); return m ? m[1] : null; } catch (e) { return null; }
 }
+// FILTRE DE GROS MOTS : remplace les mots interdits par des étoiles (côté joueur ET côté serveur).
+const Filter = (function () {
+  const BAD = ["merde", "putain", "pute", "salope", "connard", "connasse", "encule", "enculer", "nique", "niquer", "ntm", "fdp", "batard", "bordel", "salaud", "trouduc", "couille", "couilles",
+    "fuck", "fucking", "fucker", "shit", "bitch", "asshole", "dick", "pussy", "cunt", "bastard", "slut", "whore", "nigger", "nigga", "faggot", "ashawo", "oloshi", "olodo"];
+  const set = new Set(BAD);
+  const norm = (w) => w.toLowerCase().normalize("NFD").replace(/[̀-ͯ]/g, "").replace(/0/g, "o").replace(/1/g, "i").replace(/3/g, "e").replace(/4|@/g, "a").replace(/5|\$/g, "s").replace(/7/g, "t").replace(/(.)\1+/g, "$1");
+  const setN = new Set(BAD.map(norm));
+  function clean(text) { return String(text || "").replace(/[^\s]+/g, (tok) => { const core = tok.replace(/^[^A-Za-z0-9À-ÿ@$]+|[^A-Za-z0-9À-ÿ@$]+$/g, ""); const n = norm(core); return core && (setN.has(n) || set.has(core.toLowerCase())) ? tok.replace(core, "*".repeat(core.length)) : tok; }); }
+  return { clean };
+})();
+
 const clean = (s, n) => String(s || "").replace(/[\u0000-\u001f<>]/g, "").replace(/\s+/g, " ").trim().slice(0, n);
 const num = (v, a, b, d) => { v = Number(v); return Number.isFinite(v) ? Math.max(a, Math.min(b, v)) : d; };
 const color = (c, d) => (/^#[0-9a-fA-F]{6}$/.test(c) ? c : d);
@@ -39,7 +50,7 @@ wss.on("connection", (ws) => {
     else if (m.t === "pos") { p.x = num(m.x, 0, 2400, p.x); p.y = num(m.y, 0, 2300, p.y); p.hd = num(m.hd, -7, 7, 0); p.sc = m.sc ? clean(m.sc, 20) : null; p.mv = !!m.mv; }
     else if (m.t === "chat" || m.t === "dm") {
       const now = Date.now(); if (now - c.last < 700) return; c.last = now;
-      const text = clean(m.text, 140); if (!text) return;
+      const text = Filter.clean(clean(m.text, 140)); if (!text) return;
       if (m.t === "chat") all({ t: "chat", id, name: p.name, text, ts: now });
       else { const want = String(m.to || "").replace(/^@/, "").toLowerCase(), to = [...clients.values()].find((q) => q.p.name.toLowerCase() === want); if (to) send(to.ws, { t: "dm", from: id, name: p.name, text, ts: now }); else send(ws, { t: "dmfail", to: want }); }
     }
