@@ -31,7 +31,7 @@ const all = (o) => clients.forEach((c) => send(c.ws, o));
 
 const uniq = (want, id) => { let base = want || "Joueur", n = base, k = 1; const taken = (x) => [...clients.values()].some((c) => c.p.id !== id && c.p.name.toLowerCase() === x.toLowerCase()); while (taken(n)) { k++; n = base.slice(0, 13) + k; } return n; };
 wss.on("connection", (ws) => {
-  const id = String(nextId++), p = { id, name: "Joueur" + id, x: 165, y: 925, hd: 0, sc: null, mv: false, shirt: "#1e88e5", skin: "#a0673a" };
+  const id = String(nextId++), p = { id, name: "Joueur" + id, x: 165, y: 925, hd: 0, sc: null, mv: false, shirt: "#1e88e5", skin: "#a0673a", hair: "#1b1b1b", pants: "#263238" };
   const c = { ws, p, last: 0, alive: true }; clients.set(id, c);
   send(ws, { t: "welcome", id }); all({ t: "count", n: clients.size });
   ws.on("pong", () => { c.alive = true; });
@@ -44,9 +44,10 @@ wss.on("connection", (ws) => {
         clients.forEach((o) => { if (o.p.id !== id && o.p.name.toLowerCase() === nm) { send(o.ws, { t: "need_login" }); try { o.ws.close(); } catch (e) {} } });
         p.name = nm; p.ok = true;
       } else p.name = uniq(clean(m.name, 16).replace(/^@/, "").replace(/\s/g, "_") || p.name, id);
-      p.shirt = color(m.shirt, p.shirt); p.skin = color(m.skin, p.skin); send(ws, { t: "you", name: p.name });
+      p.shirt = color(m.shirt, p.shirt); p.skin = color(m.skin, p.skin); p.hair = color(m.hair, p.hair); p.pants = color(m.pants, p.pants); send(ws, { t: "you", name: p.name });
     }
     else if (SB_URL && !p.ok) return;
+    else if (m.t === "look") { p.shirt = color(m.shirt, p.shirt); p.skin = color(m.skin, p.skin); p.hair = color(m.hair, p.hair); p.pants = color(m.pants, p.pants); }
     else if (m.t === "pos") { p.x = num(m.x, 0, 2400, p.x); p.y = num(m.y, 0, 2300, p.y); p.hd = num(m.hd, -7, 7, 0); p.sc = m.sc ? clean(m.sc, 20) : null; p.mv = !!m.mv; }
     else if (m.t === "chat" || m.t === "dm") {
       const now = Date.now(); if (now - c.last < 700) return; c.last = now;
